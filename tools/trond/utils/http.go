@@ -501,28 +501,32 @@ func ExtractTgzWithStatus(tgzFile, destDir string) error {
 			// Increment the file count
 			totalFilesExtracted++
 		case tar.TypeSymlink:
+			// Resolve the symlink target
+			resolvedLinkname, err := filepath.EvalSymlinks(filepath.Join(filepath.Dir(target), header.Linkname))
+			if err != nil {
+				return fmt.Errorf("failed to resolve symlink target: %v", err)
+			}
 			// Sanitize symlink target to prevent directory traversal
-			sanitizedLinkname := filepath.Clean(header.Linkname)
-			if strings.HasPrefix(sanitizedLinkname, "/") || strings.Contains(sanitizedLinkname, "..") {
+			if !strings.HasPrefix(filepath.Clean(resolvedLinkname), filepath.Clean(destDir)+string(os.PathSeparator)) {
 				return fmt.Errorf("invalid symlink target in archive: %s -> %s", header.Name, header.Linkname)
 			}
 
-			// Ensure the resolved symlink target stays within the destination directory
-			fullTarget := filepath.Join(filepath.Dir(target), sanitizedLinkname)
-			if !strings.HasPrefix(filepath.Clean(fullTarget), filepath.Clean(destDir)+string(os.PathSeparator)) {
-				return fmt.Errorf("attempted directory traversal in symlink: %s -> %s", header.Name, header.Linkname)
-			}
-
 			// Create symlink
-			if err := os.Symlink(header.Linkname, target); err != nil {
+			if err := os.Symlink(resolvedLinkname, target); err != nil {
 				return fmt.Errorf("failed to create symlink: %v", err)
 			}
 		case tar.TypeLink:
 			// Create hard link
 			linkTarget := filepath.Join(destDir, header.Linkname)
 			// Sanitize the link target to prevent directory traversal
-			sanitizedLinkTarget := filepath.Clean(linkTarget)
-			if !strings.HasPrefix(sanitizedLinkTarget, filepath.Clean(destDir)+string(os.PathSeparator)) {
+			// Resolve the hard link target
+			resolvedLinkTarget, err := filepath.EvalSymlinks(linkTarget)
+			if err != nil {
+				return fmt.Errorf("failed to resolve hard link target: %v", err)
+			}
+
+			// Ensure the resolved hard link target stays within the destination directory
+			if !strings.HasPrefix(filepath.Clean(resolvedLinkTarget), filepath.Clean(destDir)+string(os.PathSeparator)) {
 				return fmt.Errorf("attempted directory traversal in hard link: %s -> %s", header.Name, header.Linkname)
 			}
 
