@@ -52,7 +52,8 @@ check_docker_running() {
             # Only add non-root users to the docker group
             if [ "$EUID" -ne 0 ]; then
                 sudo usermod -aG docker "$USER"
-                echo "Added current user to the docker group. You may need to log out and back in for this to take effect."
+                echo "Added current user to the docker group."
+                echo "You may need to log out and back in for this to take effect, or try 'newgrp docker' to reload your group membership."
                 echo "Skipping Docker network configuration check, as you are not root"
                 exit 0
             fi
